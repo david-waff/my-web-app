@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心晴伴侣 · 深度重构与正向支持</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(-45deg, #0b1120, #1e1b4b, #172554, #020617);
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --primary: #38bdf8;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: rgba(255, 255, 255, 0.08);
+            --radius: 16px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
+        body {
+            background: var(--bg-gradient); background-size: 400% 400%;
+            animation: gradientBG 20s ease infinite;
+            color: var(--text); min-height: 100vh; display: flex; justify-content: center;
+            padding: 20px 20px 40px; overflow-x: hidden;
+        }
+        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        .app {
+            width: 100%; max-width: 800px;
+            background: var(--card-bg); backdrop-filter: blur(24px);
+            border: 1px solid var(--border); border-radius: 24px; padding: 40px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7); position: relative;
+        }
+
+        .breathing-ring {
+            position: absolute; top: -60px; right: -60px; width: 200px; height: 200px;
+            border-radius: 50%; background: radial-gradient(circle, rgba(56,189,248,0.15) 0%, transparent 70%);
+            animation: breathe 8s ease-in-out infinite; pointer-events: none;
+        }
+        @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.5); opacity: 0.8; } }
+
+        h1 { font-size: 26px; color: #fff; text-align: center; margin-bottom: 8px; letter-spacing: 2px; }
+        .subtitle { text-align: center; color: var(--text-muted); font-size: 13px; margin-bottom: 30px; }
+
+        .input-group { position: relative; margin-bottom: 20px; }
+        textarea {
+            width: 100%; height: 120px; padding: 18px; border-radius: var(--radius); border: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.8); color: #fff; font-size: 15px; line-height: 1.7; outline: none; resize: vertical;
+        }
+        textarea:focus { border-color: var(--primary); box-shadow: 0 0 20px rgba(56, 189, 248, 0.15); }
+
+        .action-btn {
+            width: 100%; padding: 16px; border: none; border-radius: var(--radius);
+            background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-size: 16px; font-weight: bold;
+            cursor: pointer; transition: all 0.3s; box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+        }
+        .action-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(99, 102, 241, 0.5); }
+
+        .result-section { display: none; margin-top: 30px; animation: fadeIn 0.6s ease forwards; }
+        .result-section.show { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 25px; margin-bottom: 20px; position: relative;
+        }
+
+        .emotion-result { border-left: 4px solid #c4b5fd; display: flex; justify-content: space-between; align-items: center; }
+        .emotion-result h3 { font-size: 15px; color: #c4b5fd; }
+        .emotion-result .emotion-name { font-size: 18px; font-weight: bold; color: #fff; }
+        .emotion-result .match-reason { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+        .guidance-card { border-left: 4px solid #38bdf8; }
+        .guidance-card h3 { font-size: 16px; color: #7dd3fc; margin-bottom: 15px; font-weight: 600; }
+        .guidance-card p { font-size: 15px; line-height: 2; color: #e2e8f0; }
+
+        /* 心理学盲盒 */
+        .psychology-card { 
+            border-left: 4px solid #a78bfa; 
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(56, 189, 248, 0.08));
+        }
+        .psychology-card h3 { font-size: 16px; color: #c4b5fd; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px;}
+        .psychology-item { margin-bottom: 25px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 20px; }
+        .psychology-item:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+        .psychology-item .term { font-size: 15px; color: #c4b5fd; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .psychology-item .term span { background: rgba(167, 139, 250, 0.2); padding: 2px 8px; border-radius: 6px; font-size: 12px; color: #a78bfa; }
+        .psychology-item .explain { font-size: 14px; color: #cbd5e1; line-height: 1.9; margin-bottom: 12px; }
+        .psychology-item .reframe { font-size: 14px; color: #4ade80; background: rgba(34, 197, 94, 0.1); padding: 12px 15px; border-radius: 10px; border-left: 3px solid #22c55e; line-height: 1.8; }
+        
+        .video-section {
+            background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2);
+            border-left: 4px solid #22c55e; text-align: center; padding: 25px;
+        }
+        .video-section h3 { font-size: 15px; color: #4ade80; margin-bottom: 12px; }
+        .video-desc { font-size: 13px; color: #cbd5e1; line-height: 1.7; margin-bottom: 20px; }
+        .video-link-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 12px 30px; border-radius: 25px; background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff; font-size: 14px; font-weight: bold; text-decoration: none; transition: all 0.3s;
+        }
+        .video-link-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4); color: #fff; }
+
+        .audio-section { border-left: 4px solid #fbbf24; text-align: center; padding: 20px; }
+        .audio-section h4 { font-size: 13px; color: #fbbf24; margin-bottom: 12px; }
+        .audio-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 10px 25px; border-radius: 25px; border: 1px solid var(--primary);
+            background: rgba(56, 189, 248, 0.1); color: var(--primary); font-size: 14px; font-weight: bold;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .audio-btn:hover { background: var(--primary); color: #000; }
+        .audio-btn.active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+        .footer-note { text-align: center; font-size: 11px; color: #475569; margin-top: 25px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <div class="breathing-ring"></div>
+    <h1>🌿 心晴伴侣</h1>
+    <div class="subtitle">用心理学重构认知，陪你看见每一种情绪</div>
+
+    <div class="input-group">
+        <textarea id="userInput" placeholder="写下此刻你脑海中最真实的想法...&#10;&#10;例如：我觉得自己好没用，什么事都做不好。&#10;或者：今天我帮朋友解决了难题，我好开心！"></textarea>
+    </div>
+    <button class="action-btn" onclick="startAnalysis()">✨ 让我来陪陪你</button>
+
+    <div class="result-section" id="resultSection">
+        
+        <div class="card emotion-result">
+            <div>
+                <h3>🎯 识别到的情绪</h3>
+                <div class="match-reason" id="matchReason">正在分析...</div>
+            </div>
+            <div class="emotion-name" id="emotionName">未知</div>
+        </div>
+
+        <div class="card guidance-card">
+            <h3>💙 我想对你说</h3>
+            <p id="guidanceText"></p>
+        </div>
+
+        <!-- 心理学盲盒：随机抽取 -->
+        <div class="card psychology-card" id="psychologyCard">
+            <h3>🧠 心理学视角</h3>
+            <div id="psychologyContent">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+
+        <div class="card video-section">
+            <h3>🎬 为你精选的视频疗愈</h3>
+            <div class="video-desc" id="videoDesc">正在匹配专属视频...</div>
+            <a class="video-link-btn" id="videoLinkBtn" href="#" target="_blank">
+                <span>▶️</span>
+                <span id="videoBtnText">点击观看</span>
+            </a>
+        </div>
+
+        <div class="card audio-section">
+            <h4>🎧 专属疗愈音频</h4>
+            <button class="audio-btn" id="audioBtn" onclick="toggleHealingAudio()">▶️ 播放舒缓音波</button>
+        </div>
+
+        <div class="footer-note">
+            本工具基于 CBT 认知行为疗法框架提供初步梳理，不能替代专业心理咨询。如果情绪持续困扰，请务必寻求专业帮助。
+        </div>
+    </div>
+</div>
+
+<script>
+    // ================= 情绪库（新增积极情绪，扩充心理学盲盒） =================
+    const emotionData = [
+        {
+            id: 'positive',
+            name: '喜悦与平静',
+            color: '#4ade80', // 绿色
+            keywords: ['开心', '快乐', '顺利', '成功', '进步', '感恩', '好起来了', '轻松', '平静', '有力量', '想通了', '释怀', '喜悦', '幸福', '很好', '棒极了', '骄傲'],
+            guidance: [
+                "看到你的文字，我的嘴角也忍不住上扬了！真替你感到开心。这种顺畅、有力量的感觉非常珍贵，请允许自己好好享受这一刻的成就感。\n\n**请在心里对自己说：**“我值得拥有这份快乐。我今天的顺利和快乐，是我自己努力和付出的结果，我为此感到骄傲。”",
+                "太棒了！我能感受到你此刻内心的明亮和喜悦。情绪是流动的，我们不仅要学会接纳难过，更要学会接住快乐。\n\n**你可以试着做这件事：**把这个好消息分享给你信任的朋友，或者写在日记里。把这一刻的感觉深深地印在脑海里，当未来遇到阴霾时，你可以随时把它翻出来取暖。"
+            ],
+            psychology: [
+                {
+                    term: "拓展-建构理论（芭芭拉·弗雷德里克森）",
+                    tag: "积极心理学",
+                    explain: "积极情绪不仅仅是让我们感觉好，它还能‘拓展’我们的思维视野，让我们更有创造力，并且‘建构’我们的心理资源。当你感到开心时，你正在为未来的自己储备能量。",
+                    reframe: "记住此刻的感觉。这种喜悦和放松，是你内心强大的证明。"
+                },
+                {
+                    term: "心流体验（米哈里·契克森米哈赖）",
+                    tag: "积极心理学",
+                    explain: "当你投入到一件喜欢的事情中，甚至忘记了时间的流逝，这就是‘心流’。心流是幸福感的最高来源之一。试着回想一下，你刚才的开心是因为经历了什么样的专注和投入？",
+                    reframe: "多做让你能进入‘心流’状态的事情，那是你灵魂的充电站。"
+                },
+                {
+                    term: "成长型思维（卡罗尔·德韦克）",
+                    tag: "认知心理学",
+                    explain: "把每一次的成功和进步，都看作是努力和策略的产物，而不是天赋。这种‘成长型思维’会让你在未来的挑战中更有韧性。",
+                    reframe: "把‘我天生就很棒’改成‘我通过努力和方法，取得了这次的成果’。"
+                }
+            ],
+            videoDesc: "喜悦和平静值得我们好好品味。这个视频将教你如何运用积极心理学的方法，增加日常幸福感，建立强大的心理韧性。",
+            videoUrl: 'https://mms.baidu.com/sf/vsearch?pd=video&tn=vsearch&ie=utf-8&wd=积极心理学+提升幸福感+正念',
+            videoBtnText: '观看：如何提升日常幸福感'
+        },
+        {
+            id: 'self_blame',
+            name: '自我否定与自责',
+            color: '#f472b6',
+            keywords: ['没用', '废物', '失败', '糟糕', '对不起', '自责', '怪自己', '都是我的错', '不够好', '讨厌自己', '糟糕透了', '好没用', '做不好'],
+            guidance: [
+                "看到你写下这些字，我感到一阵心疼。你对自己真的太严厉了，好像全世界都可以原谅，唯独你不行。\n\n**请试着对自己说：**“我做错了一件事，并不代表我就是一个糟糕的人。此刻我感到自责，是因为我对自己有很高的期待。允许自己犯错，才是真正爱自己的开始。”"
+            ],
+            psychology: [
+                {
+                    term: "认知解离（ACT疗法）",
+                    tag: "接纳承诺疗法",
+                    explain: "你脑海中那个说‘我没用’的声音，并不等于真实的你。它只是一个想法，就像天上飘过的乌云。你不需要去反驳它，也不需要被它控制。",
+                    reframe: "把“我很没用”改成：“我注意到，我脑海中出现了一个说‘我没用’的声音。”"
+                },
+                {
+                    term: "自我关怀（克里斯汀·内夫）",
+                    tag: "积极心理学",
+                    explain: "我们常常对朋友宽容，却对自己极其苛刻。自我关怀不是软弱，而是承认生而为人，我们都会经历痛苦和失败。请把对自己的严厉，换成朋友般的温柔。",
+                    reframe: "如果是你的好朋友犯了同样的错，你会怎么骂他？你会怎么抱抱他？请把那份温柔，原封不动地分给自己。"
+                },
+                {
+                    term: "核心信念修正（贝克认知疗法）",
+                    tag: "CBT",
+                    explain: "如果你经常觉得自己‘一无是处’，这可能触碰到了深层的核心信念。这个信念往往源于童年经历。你需要像侦探一样去审视它。",
+                    reframe: "列出3件你最近做成的小事，哪怕只是按时吃饭。把事实和感觉分开。"
+                }
+            ],
+            videoDesc: "自我否定是最大的内耗。这段视频将带你认识‘自我关怀’的力量，学会如何停止内心那个总是苛责自己的声音。",
+            videoUrl: 'https://mms.baidu.com/sf/vsearch?pd=video&tn=vsearch&ie=utf-8&wd=自我关怀+自我否定+心理疗愈',
+            videoBtnText: '观看：如何停止自我攻击'
+        },
+        {
+            id: 'ignored',
+            name: '被无视与委屈',
+            color: '#f472b6',
+            keywords: ['不理我', '没回消息', '不回消息', '无视', '冷落', '忽视', '已读不回', '没理我', '沉默', '不回应', '委屈', '不理'],
+            guidance: [
+                "发出去的消息如石沉大海，那种等待、猜测、甚至自我怀疑的过程，真的太煎熬了。抱抱你。\n\n**请在心里对自己说：**“TA没有回复，只代表TA此刻可能很忙、或者没看到，这绝不代表我不够好，也不代表我不值得被回应。你的价值，不需要通过别人的即时回复来证明。”"
+            ],
+            psychology: [
+                {
+                    term: "课题分离（阿德勒心理学）",
+                    tag: "阿德勒",
+                    explain: "你发消息，是你的课题；别人回不回复，是别人的课题。你不需要为别人的沉默负责，更不能因为别人的不回应，就跨越界限去惩罚自己。",
+                    reframe: "把“他为什么不回我”这个思考，转变成“我表达了我的关心，这就足够了。剩下的，不是我能控制的。”"
+                },
+                {
+                    term: "情绪ABC理论（阿尔伯特·埃利斯）",
+                    tag: "理性情绪疗法",
+                    explain: "让你难过的，其实不是‘他没回消息’这件事（A），而是你脑海中生出的‘他不回我=我不好=我不值得被爱’这个信念（B）。",
+                    reframe: "下次情绪来临时，试着找到那个B。并在心里反驳它：“他不回我，可能是因为在忙，也可能是因为手机没电，这跟我的价值无关。”"
+                },
+                {
+                    term: "依恋焦虑（约翰·鲍尔比）",
+                    tag: "依恋理论",
+                    explain: "当我们在乎的人没有给予及时回应时，内心涌起的恐慌和自责，往往是内心深处害怕被抛弃的‘依恋警报’在响。这不是你‘太作’或‘想太多’，而是你的神经系统在试图保护你。",
+                    reframe: "对警报说：“谢谢你的提醒，我收到你的担心了，但此刻我是安全的。即使没有及时回复，我也依然是完整的、安全的。”"
+                }
+            ],
+            videoDesc: "被无视是极其痛苦的体验，它会触发我们内心的不安。这段视频将陪你一起理解这种失落，并带你重建被忽视时的自我价值感。",
+            videoUrl: 'https://mms.baidu.com/sf/vsearch?pd=video&tn=vsearch&ie=utf-8&wd=被忽视的伤痛+自我关怀',
+            videoBtnText: '观看：如何应对被忽视的伤痛'
+        },
+        {
+            id: 'anxiety',
+            name: '焦虑与担忧',
+            color: '#38bdf8',
+            keywords: ['焦虑', '紧张', '担心', '害怕', '慌', '不安', '睡不着', '心慌', '万一', '怎么办'],
+            guidance: [
+                "我听到了你心里那个‘万一’的声音。焦虑就像大脑在自动播放一部灾难片，试图保护你免受伤害，但它让你太累了。\n\n**请在心里对自己说：**“我允许自己此刻感到焦虑，但这不代表坏事一定会发生。此刻的我，是安全的。不要试图把未来的重担全部压在现在的肩膀上。”"
+            ],
+            psychology: [
+                {
+                    term: "灾难化思维（阿伦·贝克）",
+                    tag: "CBT",
+                    explain: "焦虑的本质，往往是我们把未来的可能性，当成了必然发生的灾难。大脑为了让我们提前防范，会拼命放大危险信号。但这只是你的‘情绪警报器’过于灵敏了。",
+                    reframe: "试着问自己：最坏的情况发生的客观概率有多大？即使发生了，你真的无法应对吗？"
+                },
+                {
+                    term: "正念（乔恩·卡巴金）",
+                    tag: "正念减压",
+                    explain: "焦虑通常是指向未来的（‘万一怎么办’），而正念是让你回到当下的。通过关注呼吸、感受身体的感觉，你可以把注意力从对未来的恐惧中拉回到此刻的安全感中。",
+                    reframe: "把注意力放在脚底与鞋子接触的感觉上，或者呼吸时空气进出鼻腔的温度上。此刻，你是安全的。"
+                },
+                {
+                    term: "控制二分法（斯多葛哲学）",
+                    tag: "斯多葛学派",
+                    explain: "有些事我们能控制（自己的努力、态度），有些事我们控制不了（别人的看法、结果）。焦虑往往源于我们试图控制那些我们无法控制的事情。",
+                    reframe: "把让你焦虑的事情分为两类：我能改变的，和我不能改变的。专注于前者，接纳后者。"
+                }
+            ],
+            videoDesc: "当焦虑来袭，你的身体和思绪都在狂奔。这段引导视频将用CBT和正念技术，带你在这个当下落地，找回对身体的掌控权。",
+            videoUrl: 'https://mms.baidu.com/sf/vsearch?pd=video&tn=vsearch&ie=utf-8&wd=焦虑急救+CBT+正念呼吸',
+            videoBtnText: '观看：焦虑发作时的急救法'
+        },
+        {
+            id: 'depression',
+            name: '低落与无力',
+            color: '#a78bfa',
+            keywords: ['抑郁', '低落', '没兴趣', '不想动', '疲惫', '没力气', '没意义', '麻木', '提不起劲', '没希望', '好累', '活着'],
+            guidance: [
+                "看到你的文字，我感到一阵心疼。当世界褪色时，连起床都需要莫大的勇气。你此刻的无力感，并不是因为你懒，而是你的能量槽真的空了。\n\n**请允许自己现在就像一块没电的电池。**不用强求自己振作，哪怕今天只是躺在床上发呆，也是一种对自己的照顾。"
+            ],
+            psychology: [
+                {
+                    term: "行为激活（CBT）",
+                    tag: "行为疗法",
+                    explain: "很多人以为‘有动力了才去行动’，但心理学发现恰恰相反：是‘先行动，才产生动力’。低落时，不要定大目标，只做一件极其微小的事，完成微小的行动，能帮你慢慢找回掌控感。",
+                    reframe: "告诉自己：“我不需要振作，我只需要站起来，喝一口水。”"
+                },
+                {
+                    term: "消极滤镜（阿伦·贝克）",
+                    tag: "CBT",
+                    explain: "抑郁时，大脑会戴上一副灰暗的滤光镜，只让你看到失败和绝望，过滤掉所有积极的可能。请意识到：这只是一个‘滤镜’，不是客观事实。",
+                    reframe: "当你觉得“一切都没希望”时，告诉自己：“这是我抑郁的情绪在说话，这不是客观现实。等我休息好了，看到的世界会不一样。”"
+                }
+            ],
+            videoDesc: "在低谷期，我们往往觉得做什么都没有意义。这个视频为你讲述‘行为激活’的心理学原理，帮你用最微小的一步，重新点亮生活的微光。",
+            videoUrl: 'https://mms.baidu.com/sf/vsearch?pd=video&tn=vsearch&ie=utf-8&wd=抑郁低落+行为激活+心理疏导',
+            videoBtnText: '观看：走出低落的微小行动'
+        },
+        {
+            id: 'anger',
+            name: '愤怒与烦躁',
+            color: '#f59e0b',
+            keywords: ['愤怒', '生气', '烦躁', '火大', '看不惯', '凭什么', '不公平', '气死', '烦死', '讨厌'],
+            guidance: [
+                "我能感觉到你心里的那团火。愤怒通常是因为界限被侵犯，或者某种‘应该’被打破。你的愤怒是合理的，它在保护你。\n\n**我们先不急着灭火。**试着用力握紧拳头 5 秒，然后猛地松开，感受那种松弛感。"
+            ],
+            psychology: [
+                {
+                    term: "非理性信念（阿尔伯特·埃利斯）",
+                    tag: "理性情绪疗法",
+                    explain: "愤怒往往源于我们心中的‘绝对化要求’，比如‘他必须尊重我’、‘事情必须按我想的发展’。当现实违背了‘必须’，愤怒就爆发了。",
+                    reframe: "试着把‘必须’降级为‘我希望’。这会给你留出喘息的空间。把“他凭什么这样”换成“他这样做让我很失望，我希望他能尊重我”。"
+                },
+                {
+                    term: "情绪能量转化（升华）",
+                    tag: "精神分析",
+                    explain: "愤怒是一种强烈的能量。如果你把它压抑起来，会伤害自己；如果你把它发泄在别人身上，会伤害关系。最好的方式是‘升华’。",
+                    reframe: "把愤怒变成改变现实的动力。去运动、写日记、或者打扫卫生，让这股能量流走，而不是灼伤自己。"
+                }
+            ],
+            videoDesc: "愤怒是一种强烈的能量，它在保护你，但也可能灼伤你。这段视频将带你探索愤怒背后的核心需求，学习如何在不伤害自己和他人的前提下，表达你的力量。",
+            videoUrl: 'https://mms.baidu.com/sf/vsearch?pd=video&tn=vsearch&ie=utf-8&wd=愤怒管理+CBT+情绪控制',
+            videoBtnText: '观看：如何驾驭你的愤怒'
+        }
+    ];
+
+    // ... (音频引擎保持不变，省略以节省篇幅，实际粘贴时保留)
+    let audioCtx = null; let audioNodes = []; let isPlaying = false;
+    function toggleHealingAudio() {
+        const btn = document.getElementById('audioBtn');
+        if (isPlaying) { stopAudio(); btn.innerText = '▶️ 播放舒缓音波'; btn.classList.remove('active'); isPlaying = false; } 
+        else { startAudio(); btn.innerText = '⏸️ 正在播放 (点击暂停)'; btn.classList.add('active'); isPlaying = true; }
+    }
+    function startAudio() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            const bufferSize = audioCtx.sampleRate * 4;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            let lastOut = 0.0;
+            for (let i = 0; i < bufferSize; i++) { const white = Math.random() * 2 - 1; data[i] = (lastOut + (0.02 * white)) / 1.02; lastOut = data[i]; data[i] *= 3.5; }
+            const noiseSource = audioCtx.createBufferSource(); noiseSource.buffer = buffer; noiseSource.loop = true;
+            const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 400;
+            const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 2);
+            noiseSource.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noiseSource.start();
+            const osc = audioCtx.createOscillator(); const oscGain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.value = 10; oscGain.gain.value = 0.02;
+            osc.connect(oscGain); oscGain.connect(audioCtx.destination); osc.start();
+            audioNodes = [noiseSource, osc];
+        } catch (e) { alert('浏览器无法播放疗愈音频。'); }
+    }
+    function stopAudio() { audioNodes.forEach(node => { try { node.stop(); } catch(e){} }); if (audioCtx) { audioCtx.close(); audioCtx = null; } audioNodes = []; }
+
+    // ================= 情绪分析引擎 =================
+    function analyzeEmotion(text) {
+        let bestMatch = null;
+        let bestScore = 0;
+        let matchReason = "";
+
+        emotionData.forEach(emo => {
+            let score = 0;
+            let hits = [];
+            
+            emo.keywords.forEach(k => {
+                if (text.includes(k)) { score += 2; hits.push(k); }
+            });
+
+            // 句式加权
+            if (emo.id === 'positive') {
+                if (/开心|快乐|顺利|成功|很好|棒|骄傲|舒服|爽/.test(text)) { score += 5; hits.push("正向表达"); }
+            }
+            if (emo.id === 'self_blame') {
+                if (/都是我.*错|我.*不好|我.*没用|我.*失败|我.*不行|做不好/.test(text)) { score += 5; hits.push("自责句式"); }
+            }
+            if (emo.id === 'ignored') {
+                if (/不.*理我|没.*回我|不.*理.*人|沉默|忽视/.test(text)) { score += 5; hits.push("被忽视句式"); }
+            }
+            if (emo.id === 'anxiety') {
+                if (/万一|如果.*怎么|怕.*发生|担心.*未来/.test(text)) { score += 5; hits.push("未来担忧句式"); }
+            }
+            if (emo.id === 'depression') {
+                if (/没.*意思|不想.*动|没.*希望|活着.*累|好累|没.*意义/.test(text)) { score += 5; hits.push("无力绝望句式"); }
+            }
+
+            if (score > bestScore) { bestScore = score; bestMatch = emo; matchReason = hits.length > 0 ? `命中关键词：${hits.join("、")}` : "基于句式结构判断"; }
+        });
+
+        // 兜底逻辑：如果没有匹配到任何情绪，默认走“积极/平静”
+        if (!bestMatch || bestScore === 0) {
+            bestMatch = emotionData.find(e => e.id === 'positive') || emotionData[0];
+            matchReason = "未匹配到负面关键词，默认引导至积极平静";
+        }
+
+        return { emotion: bestMatch, reason: matchReason };
+    }
+
+    // ================= 核心渲染逻辑 =================
+    function startAnalysis() {
+        const text = document.getElementById('userInput').value.trim();
+        if (!text) { alert('请先写下你的想法...'); return; }
+
+        const result = analyzeEmotion(text);
+        const matchedEmotion = result.emotion;
+
+        document.getElementById('emotionName').innerText = matchedEmotion.name;
+        document.getElementById('emotionName').style.color = matchedEmotion.color;
+        document.getElementById('matchReason').innerText = `分析依据：${result.reason}`;
+
+        const randomGuidance = matchedEmotion.guidance[Math.floor(Math.random() * matchedEmotion.guidance.length)];
+        document.getElementById('guidanceText').innerHTML = `你说：“<span style="color:#facc15; font-style:italic;">${text.length > 30 ? text.substring(0, 30) + '...' : text}</span>”<br><br>${randomGuidance.replace(/\n/g, '<br>')}`;
+
+        // 🌟 核心修改：随机抽取心理学盲盒
+        const psychContent = document.getElementById('psychologyContent');
+        let psychHtml = '';
+        
+        if (matchedEmotion.psychology && matchedEmotion.psychology.length > 0) {
+            // 打乱数组，随机抽取最多3个理论
+            const shuffled = [...matchedEmotion.psychology].sort(() => 0.5 - Math.random());
+            const selected = shuffled.slice(0, 3);
+            
+            selected.forEach((item) => {
+                psychHtml += `
+                    <div class="psychology-item">
+                        <div class="term">🔹 ${item.term} <span>${item.tag}</span></div>
+                        <div class="explain">${item.explain}</div>
+                        <div class="reframe">💡 认知重构练习：${item.reframe}</div>
+                    </div>
+                `;
+            });
+        } else {
+            psychHtml = '<p style="color:#94a3b8; font-size:14px;">本次未匹配到专门的心理学解析。</p>';
+        }
+        psychContent.innerHTML = psychHtml;
+
+        document.getElementById('videoDesc').innerText = matchedEmotion.videoDesc;
+        document.getElementById('videoLinkBtn').href = matchedEmotion.videoUrl;
+        document.getElementById('videoBtnText').innerText = matchedEmotion.videoBtnText;
+
+        const section = document.getElementById('resultSection');
+        section.classList.remove('show');
+        void section.offsetWidth;
+        section.classList.add('show');
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+</script>
+</body>
+</html>
